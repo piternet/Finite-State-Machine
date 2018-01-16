@@ -77,15 +77,19 @@ bool accept(Machine *m, char *w, int *r, int ri, int val) {
 	}
 }
 
-int main() {
+int main(int argc, char *argv[]) {
 	Machine *m = malloc(sizeof(Machine));
 	readInput(m);
 	char *w = malloc(sizeof(char) * MAXLEN);
 	int *r = malloc(sizeof(int) * MAXLEN);
+	int write_dsc = atoi(argv[1]);
 	scanf(" %s", w);
-	//printf("w = %s\n", w);
-	bool result = accept(m, w, r, 0, m->q);
-	printf("%s", "siemka");
+	if (accept(m, w, r, 0, m->q))
+		if (write(write_dsc, "1", sizeof(char)) != sizeof(char))
+			perror("write in run\n");
+	else
+		if (write(write_dsc, "0", sizeof(char)) != sizeof(char))
+			perror("write in run\n");
 	free(w);
 	free(r);
 	free(m);

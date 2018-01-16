@@ -30,46 +30,54 @@ void waitForWords() {
 
 void testRun(Machine *m) {
 	// make pipe, dup, execve run
-	int stdin_copy = dup(0);
-	int stdout_copy = dup(1);
 	int pipe_dsc[2];
 	if (pipe(pipe_dsc) == -1) {
 		perror("pipe in validator\n");
 	}
 	char *w = malloc(sizeof(char) * MAXLEN);
 	scanf(" %s", w);
-	if (close(0) == -1)
-		perror("close in validator\n");
-	if (dup(pipe_dsc[0]) != 0)
-		perror("dup in validator\n");
-	if (close(1) == -1)
-		perror("close in validator\n");
-	if (dup(pipe_dsc[1]) != 1)
-		perror("dup in validator\n");
-	// if (close(pipe_dsc[0]) == -1)
-	// 	perror("close in validator\n");
-	// if (close(pipe_dsc[1]) == -1)
-	// 	perror("close in validator\n");
 	switch (fork()) {
 		case -1:
 			perror("fork in validator\n");
 		case 0:
-			execl("run", "run", (char *) NULL);
+			if (close(0) == -1)
+				perror("close in validator\n");
+			if (dup(pipe_dsc[0]) != 0)
+				perror("dup in validator\n");
+			char pipe_write_dsc_str[10];
+			sprintf(pipe_write_dsc_str, "%d", pipe_dsc[1]);
+
+			execl("run", "run", pipe_write_dsc_str, (char *) NULL);
 			perror("execlp in validator\n");
-		default:		
+		default: ;	
+			int stdout_copy = dup(1);
+			if (close(1) == -1)
+				perror("close in validator\n");
+			if (dup(pipe_dsc[1]) != 1)
+				perror("dup in validator\n");
+			
 			printMachine(m);
 			printf("%s\n", w);
 			if (wait(0) == -1)
 				perror("wait in validator\n");
-			dup2(stdin_copy, 0);
+			char msg[1];
+			int len;
+			if ((len = read(pipe_dsc[0], msg, sizeof(char)) != sizeof(char)) == -1)
+				perror("read in validator\n");
 			dup2(stdout_copy, 1);
-			close(stdin_copy);
-			close(stdout_copy);
-			char * result;
-			scanf(" %s", result);
-			printf("wynik = %s\n", result);
-			
+			if (close(stdout_copy) == -1)
+				perror("close in validator\n");
+			if (close(pipe_dsc[0]) == -1)
+				perror("close in validator\n");
+			if (close(pipe_dsc[1]) == -1)
+				perror("close in validator\n");
+			printf("msg=%s\n", msg);
 	}
+}
+
+void server() {
+	// if (poll(&(struct pollfd){ .fd = fd, .events = POLLIN }, 1, 0)==1)
+    /* data available */
 }
 
 int main() {
