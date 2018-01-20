@@ -75,20 +75,47 @@ void testRun(Machine *m) {
 	}
 }
 
-void server() {
+void server(Machine *m, Validator *v) {
+	/*
+	*	1. Check if we got any new tester - if yes, add it.
+		2. Check if any tester sent some word.
+			2a. If he did - fork new run process and send him the word.
+			2b. If the word sent == '!':
+		3. Check if any run process did sent something back to us.
+	/*
 	// if (poll(&(struct pollfd){ .fd = fd, .events = POLLIN }, 1, 0)==1)
     /* data available */
+    mqd_t testers = mq_open(MQ_NAME_TESTERS, O_RDWR | O_CREAT, 0777, NULL);
+    if (testers == (mqd_t) -1) {
+    	perror("mq_open in validator\n");
+    }
+    while (true) {
+    	/* Check if we got any new tester */
+    	int ret, buff_size;
+    	char buff[MAXLEN];
+    	ret = mq_receive(testers, buff, buff_size, NULL);
+    	if (ret < 0) {
+    		if (errno != EAGAIN)
+    			perror("mq_receive in validator\n");
+    	}
+    	else {
+    		/* We got new tester */
+    		// v->testers[v->testersSize]
+    		printf("new tester, his msg=%s\n", buff);
+    		v->testersSize++;
+    	}
+    }
 }
 
 int main() {
 	Machine *machine = malloc(sizeof(Machine));
+	Validator *validator = malloc(sizeof(Validator));
+	validator->testersSize = 0;
 	readInput(machine);
 	printMachine(machine);
-	/* open queue, both for reading and writing */
-	/* mqd_t mq = mq_open(mq_name, O_RDWR | O_CREAT);
-	waitForWords(); */
-
-	testRun(machine);
+	
+	server(machine, validator);
+	//testRun(machine);
 
 	free(machine);
 	return 0;
