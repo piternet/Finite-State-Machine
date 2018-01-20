@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <string.h>
+#include <strings.h>
 #include <fcntl.h>
 #include <error.h>
 #include <errno.h>
@@ -36,7 +37,8 @@ typedef struct Machine {
 
 typedef struct Tester {
 	pid_t pid;
-	int rcd, acc;
+	int snt, rcd, acc;
+	mqd_t mq_write, mq_read;
 } Tester;
 
 typedef struct Validator {
