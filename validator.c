@@ -114,8 +114,8 @@ void newTester(Machine *m, Validator *v, char *buff) {
     strcpy(name_read, "/r");
     strcat(name_read, pid_str);
     printf("%s %s\n", name_write, name_read);
-    v->testers[v->testersSize].mq_write = mq_open(name_write, O_RDWR | O_NONBLOCK | O_CREAT, 0777, NULL);
-    v->testers[v->testersSize].mq_read = mq_open(name_read, O_RDWR | O_CREAT, 0777, NULL);
+    v->testers[v->testersSize].mq_write = mq_open(name_write, O_RDWR | O_NONBLOCK | O_CREAT, MQ_MODE, NULL);
+    v->testers[v->testersSize].mq_read = mq_open(name_read, O_RDWR | O_CREAT, MQ_MODE, NULL);
 	v->testersSize++;
 	free(buff);
 }
@@ -163,7 +163,7 @@ void server(Machine *m, Validator *v) {
 	/*
 	// if (poll(&(struct pollfd){ .fd = fd, .events = POLLIN }, 1, 0)==1)
     /* data available */
-    mqd_t testers = mq_open(MQ_NAME_TESTERS, O_RDWR | O_NONBLOCK | O_CREAT, 0777, NULL);
+    mqd_t testers = mq_open(MQ_NAME_TESTERS, O_RDWR | O_NONBLOCK | O_CREAT, MQ_MODE, NULL);
     if (testers == (mqd_t) -1) {
     	perror("mq_open in validator\n");
     }

@@ -25,6 +25,7 @@
 #define MSGSIZE			8192
 #define EMPTYCHAR		'.'
 #define EMPTYCHARSTR	"."
+#define MQ_MODE			0666
 
 typedef struct Machine {
 	/* machine consts */
@@ -41,6 +42,7 @@ typedef struct Tester {
 	pid_t pid;
 	int snt, rcd, acc;
 	mqd_t mq_write, mq_read;
+	int pipe_dsc[2];
 } Tester;
 
 typedef struct Validator {

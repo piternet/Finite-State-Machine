@@ -16,7 +16,7 @@ void readAndSend(Tester *t) {
 	sprintf(pid_str, "%d", (int) getpid());
 	printf("PID: %s\n", pid_str);
 	char line[MAXLEN];
-	mqd_t testers = mq_open(MQ_NAME_TESTERS, O_WRONLY | O_NONBLOCK | O_CREAT, 0777, NULL);
+	mqd_t testers = mq_open(MQ_NAME_TESTERS, O_WRONLY | O_NONBLOCK | O_CREAT, MQ_MODE, NULL);
     if (testers == (mqd_t) -1) {
     	perror("mq_open in tester\n");
     }
@@ -30,8 +30,8 @@ void readAndSend(Tester *t) {
     strcpy(name_read, "/r");
     strcat(name_read, pid_str);
     printf("%s %s\n", name_write, name_read);
-    mqd_t mq_write = mq_open(name_write, O_RDWR | O_NONBLOCK | O_CREAT, 0777, NULL);
-    mqd_t mq_read = mq_open(name_read, O_RDWR | O_CREAT | O_NONBLOCK, 0777, NULL);
+    mqd_t mq_write = mq_open(name_write, O_RDWR | O_NONBLOCK | O_CREAT, MQ_MODE, NULL);
+    mqd_t mq_read = mq_open(name_read, O_RDWR | O_CREAT | O_NONBLOCK, MQ_MODE, NULL);
     if (mq_write == (mqd_t) -1 || mq_read == (mqd_t) -1) {
     	perror("mq_open in tester\n");
     }
