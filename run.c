@@ -10,7 +10,7 @@ bool accept(Machine *m, char *w, int *r, int ri, int val) {
 	r[ri] = val;
 	int i = 0;
 	
-	if (ri >= strlen(w)) {
+	if (ri >= strlen(w) || (strlen(w) == 1 && w[0] == EMPTYCHAR)) {
 		// check if last state is accepting
 		while(i < m->accSize) {
 			if (m->acc[i++] == r[ri])
@@ -52,7 +52,6 @@ bool accept(Machine *m, char *w, int *r, int ri, int val) {
 					i++;
 			}
 		}
-
 		while ((wpid = wait(&status)) > 0); // wait for all children
 		if (close(pipe_dsc[1]) == -1) {
 			kill(m, w, r);
@@ -79,27 +78,32 @@ bool accept(Machine *m, char *w, int *r, int ri, int val) {
 
 	}
 	else {
-		return accept(m, w, r, ri+1, m->trans[r[ri]][wi][i]);;
+		printf("ide dalej\n");
+		return accept(m, w, r, ri+1, m->trans[r[ri]][wi][0]);
 	}
 }
 
 int main(int argc, char *argv[]) {
+	printf("run process\n");
 	Machine *m = malloc(sizeof(Machine));
 	readInput(m);
 	char *w = malloc(sizeof(char) * MAXLEN);
 	int *r = malloc(sizeof(int) * MAXLEN);
 	int write_dsc = atoi(argv[1]);
 	scanf(" %s", w);
-	if (accept(m, w, r, 0, m->q))
+	bool result = accept(m, w, r, 0, m->q);
+	if (result) {
 		if (write(write_dsc, "1", sizeof(char)) != sizeof(char)) {
 			kill(m, w, r);
 			perror("write in run\n");
 		}
-	else
+	}
+	else {
 		if (write(write_dsc, "0", sizeof(char)) != sizeof(char)) {
-			kill(m, w, r);
+			kill(m, w, r);	
 			perror("write in run\n");
 		}
+	}
 	kill(m, w, r);
 	return 0;
 }

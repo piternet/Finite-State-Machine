@@ -31,46 +31,52 @@ void readAndSend(Tester *t) {
     strcat(name_read, pid_str);
     printf("%s %s\n", name_write, name_read);
     mqd_t mq_write = mq_open(name_write, O_RDWR | O_NONBLOCK | O_CREAT, 0777, NULL);
-    mqd_t mq_read = mq_open(name_read, O_RDWR | O_CREAT, 0777, NULL);
+    mqd_t mq_read = mq_open(name_read, O_RDWR | O_CREAT | O_NONBLOCK, 0777, NULL);
     if (mq_write == (mqd_t) -1 || mq_read == (mqd_t) -1) {
     	perror("mq_open in tester\n");
     }
-	while(fgets(line, MAXLEN, stdin) != NULL) {
-		line[strlen(line)-1] = '\0'; // cut last character == '\n'
-		if(line[0] == ENDCHAR) {
-			// zakonczenie pracy
-		}
-		else {
-			// send normal word
+    char buff[MSGSIZE];
+	while(true) {
+		if (fgets(line, MAXLEN, stdin) != NULL) {
+			line[strlen(line)-1] = '\0'; // cut last character == '\n'
 			ret = mq_send(mq_write, line, strlen(line), 1);
-			t->snt++;
 			printf("sent '%s' to validator\n", line);
 		    if (ret < 0) {
 		    	perror("mq_send in tester\n");
 		    }
-		    char buff[2];
-		    // TODO: puste slowo1!!!
-		    int buff_size;
-		    ret = mq_receive(mq_read, buff, buff_size, NULL);
-		    if (ret < 0) {
-		    	perror("mq_receive in tester\n");
-		    }
-		    printf("%s %c\n", line, buff[0]);
-		    t->rcd++;
-		    if (buff[0] == 'A')
-		    	t->acc++;
+		    t->snt++;
 		}
+	    bzero(buff, MSGSIZE);
+	    int buff_size;
+	    ret = mq_receive(mq_read, buff, MSGSIZE, NULL);
+	    if (ret < 0) {
+    		if (errno != EAGAIN)
+    			perror("mq_receive in tester\n");
+    	}
+    	else {
+    		// we got some word from validator
+    		t->rcd++;
+    		printf("%s\n", buff);
+    		char *w = strtok(buff, " ");
+    		char *w2 = strtok(NULL, " ");
+    		if (w2 == NULL) {
+    			if (w[0] == 'A')
+    				t->acc++;
+    		}
+    		else if (w2[0] == 'A')
+	    		t->acc++;
+    	}	    
 	}
 	// TODO:close + unlink mq
 }
 
 int main() {
 	Tester *tester = malloc(sizeof(Tester));
-	t->rcd = 0;
-	t->acc = 0;
-	t->snt = 0;
+	tester->rcd = 0;
+	tester->acc = 0;
+	tester->snt = 0;
 	readAndSend(tester);
-	printOutput(t);
+	printOutput(tester);
 	kill(tester);
 	return 0;
 }

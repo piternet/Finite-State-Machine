@@ -22,7 +22,9 @@
 #define ENDCHAR			'!'
 #define INTA			(int)('a')
 #define MQ_NAME_TESTERS	"/testers"
-#define MSGSIZE			10
+#define MSGSIZE			8192
+#define EMPTYCHAR		'.'
+#define EMPTYCHARSTR	"."
 
 typedef struct Machine {
 	/* machine consts */
