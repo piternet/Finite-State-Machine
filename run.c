@@ -1,6 +1,6 @@
 #include "helper.h"
 
-void kill(Machine *m, char *w, int *r) {
+void terminate(Machine *m, char *w, int *r) {
 	free(w);
 	free(r);
 	free(m);
@@ -23,7 +23,7 @@ bool accept(Machine *m, char *w, int *r, int ri, int val) {
 	pid_t child_pid, wpid;
 	int pipe_dsc[2], status = 0;
 	if (pipe(pipe_dsc) == -1) {
-		kill(m, w, r);
+		terminate(m, w, r);
 		perror("pipe in run\n");
 	}
 	// printf("pid=%d, ri=%d, r[ri]=%d; pipe_read=%d, pipe_write=%d\n", getpid(), ri, r[ri], pipe_dsc[0], pipe_dsc[1]);
@@ -31,19 +31,19 @@ bool accept(Machine *m, char *w, int *r, int ri, int val) {
 		while (i < m->transSize[r[ri]][wi]) {
 			switch (child_pid = fork()) {
 				case -1:
-					kill(m, w, r);
+					terminate(m, w, r);
 					perror("fork in run\n");
 				case 0: ;
 					// child
 					if (close(pipe_dsc[0]) == -1) {
-						kill(m, w, r);
+						terminate(m, w, r);
 						perror("close in run\n");
 					}
 					bool my_result = accept(m, w, r, ri+1, m->trans[r[ri]][wi][i]);
 					char msg[1];
 					msg[0] = my_result ? '1' : '0';
 					if (write(pipe_dsc[1], msg, sizeof(msg)) != sizeof(msg)) {
-						kill(m, w, r);
+						terminate(m, w, r);
 						perror("write in run\n");
 					}
 					// printf("pid=%d, write to fd=%d done, result = '%s'\n", getpid(), pipe_dsc[1], msg);
@@ -54,7 +54,7 @@ bool accept(Machine *m, char *w, int *r, int ri, int val) {
 		}
 		while ((wpid = wait(&status)) > 0); // wait for all children
 		if (close(pipe_dsc[1]) == -1) {
-			kill(m, w, r);
+			terminate(m, w, r);
 			perror("close in run\n");
 		}
 		i = 0;
@@ -62,7 +62,7 @@ bool accept(Machine *m, char *w, int *r, int ri, int val) {
 			char msg[MAXLEN];
 			int len;
 			if ((len = read(pipe_dsc[0], msg, sizeof(char))) == -1) {
-				kill(m, w, r);
+				terminate(m, w, r);
 				perror("read in run\n");
 			}
 			msg[len] = '\0';
@@ -78,13 +78,11 @@ bool accept(Machine *m, char *w, int *r, int ri, int val) {
 
 	}
 	else {
-		printf("ide dalej\n");
 		return accept(m, w, r, ri+1, m->trans[r[ri]][wi][0]);
 	}
 }
 
 int main(int argc, char *argv[]) {
-	printf("run process\n");
 	Machine *m = malloc(sizeof(Machine));
 	readInput(m);
 	char *w = malloc(sizeof(char) * MAXLEN);
@@ -92,18 +90,12 @@ int main(int argc, char *argv[]) {
 	int write_dsc = atoi(argv[1]);
 	scanf(" %s", w);
 	bool result = accept(m, w, r, 0, m->q);
-	if (result) {
-		if (write(write_dsc, "1", sizeof(char)) != sizeof(char)) {
-			kill(m, w, r);
-			perror("write in run\n");
-		}
+	char ans[1];
+	ans[0] = result ? '1' : '0';
+	if (write(write_dsc, ans, sizeof(char)) != sizeof(char)) {
+		terminate(m, w, r);
+		perror("write in run\n");
 	}
-	else {
-		if (write(write_dsc, "0", sizeof(char)) != sizeof(char)) {
-			kill(m, w, r);	
-			perror("write in run\n");
-		}
-	}
-	kill(m, w, r);
+	terminate(m, w, r);
 	return 0;
 }

@@ -1,6 +1,6 @@
 #include "helper.h"
 
-void kill(Machine *m, Validator *v, mqd_t testers) {
+void terminate(Machine *m, Validator *v, mqd_t testers) {
 	if (mq_close(testers))
 		perror("mq_close testers in validator\n");
 	if (mq_unlink(MQ_NAME_TESTERS))
@@ -10,8 +10,16 @@ void kill(Machine *m, Validator *v, mqd_t testers) {
 			perror("mq_close testers in validator\n");
 		if (mq_close(v->testers[i].mq_write))
 			perror("mq_close testers in validator\n");
+		if (close(v->testers[i].pipe_dsc[0]))
+			perror("close pipe in validator\n");
+		if (close(v->testers[i].pipe_dsc[1]))
+			perror("close pipe in validator\n");
 		// testers should do mq_unlink
 	}
+	if (close(v->pipe_snt[0]))
+		perror("close pipe in validator\n");
+	if (close(v->pipe_snt[1]))
+		perror("close pipe in validator\n");
 	free(m);
 	free(v);
 	exit(0);
@@ -40,8 +48,26 @@ void printMachine(Machine *m) {
 	}
 }
 
-
 void printOutput(Validator *v) {
+	int buff_len = v->testersSize+10;
+	char *buffer = malloc(buff_len * sizeof(char));
+	for (int i=0; i<v->testersSize; i++) {
+		bzero(buffer, buff_len);
+		int len, res = 0;
+		if ((len = read(v->testers[i].pipe_dsc[0], buffer, buff_len)) == -1)
+    		perror("read in validator\n");
+    	for (int j=0; j<strlen(buffer); j++)
+    		if (buffer[j] == '1')
+    			res++;
+    	v->acc += res;
+    	v->testers[i].acc = res;
+	}
+	bzero(buffer, buff_len);
+	if ((buff_len = read(v->pipe_snt[0], buffer, buff_len)) == -1)
+    	perror("read in validator\n");
+    for (int j=0; j<strlen(buffer); j++)
+		if (buffer[j] == '1')
+			v->snt++;
 	printf("Rcd: %d\n", v->rcd);
 	printf("Snt: %d\n", v->snt);
 	printf("Acc: %d\n", v->acc);
@@ -50,11 +76,12 @@ void printOutput(Validator *v) {
 		printf("Rcd: %d\n", v->testers[i].rcd);
 		printf("Acc: %d\n", v->testers[i].acc);
 	}
+	free(buffer);
 }
 
 bool testRun(Machine *m, char *w) {
 	// make pipe, dup, execve run
-	printf("test_run, w = %s\n", w);
+	//printf("test_run, w = %s\n", w);
 	int pipe_dsc[2];
 	if (pipe(pipe_dsc) == -1) {
 		perror("pipe in validator\n");
@@ -88,7 +115,7 @@ bool testRun(Machine *m, char *w) {
 			if ((len = read(pipe_dsc[0], msg, sizeof(char)) != sizeof(char)) == -1)
 				perror("read in validator\n");
 			dup2(stdout_copy, 1);
-			printf("ok, mam odp\n");
+			//printf("ok, mam odp\n");
 			if (close(stdout_copy) == -1)
 				perror("close in validator\n");
 			if (close(pipe_dsc[0]) == -1)
@@ -100,12 +127,34 @@ bool testRun(Machine *m, char *w) {
 	return false;
 }
 
+void sendKillSignals(Validator *v) {
+	// send kill signals to all testers
+	for (int i=0; i<v->testersSize; i++) {
+		//printf("killing %d\n", v->testers[i].pid);
+		if (v->testers[i].dead)
+			continue;
+		if (kill(v->testers[i].pid, SIGRTMIN) == -1) {
+			perror("kill in validator\n");
+		}  
+	}
+}
+
 void newTester(Machine *m, Validator *v, char *buff) {
+	if(buff[0] == ENDCHAR) {
+		// dead message
+		pid_t tester_pid = (pid_t) atoi(buff+1);
+		for (int i=0; i<v->testersSize; i++) {
+			if (v->testers[i].pid == tester_pid)
+				v->testers[i].dead = true;
+		}
+		return;
+	}
 	pid_t tester_pid = (pid_t) atoi(buff);
 	v->testers[v->testersSize].pid = tester_pid;
 	v->testers[v->testersSize].rcd = 0;
 	v->testers[v->testersSize].acc = 0;
-	printf("new tester, pid=%d\n", v->testers[v->testersSize].pid);
+	v->testers[v->testersSize].dead = false;
+	//printf("new tester, pid=%d\n", v->testers[v->testersSize].pid);
 	char name_write[10], name_read[10];
 	char pid_str[6];
 	sprintf(pid_str, "%d", (int) tester_pid);
@@ -113,25 +162,31 @@ void newTester(Machine *m, Validator *v, char *buff) {
     strcat(name_write, pid_str);
     strcpy(name_read, "/r");
     strcat(name_read, pid_str);
-    printf("%s %s\n", name_write, name_read);
-    v->testers[v->testersSize].mq_write = mq_open(name_write, O_RDWR | O_NONBLOCK | O_CREAT, MQ_MODE, NULL);
-    v->testers[v->testersSize].mq_read = mq_open(name_read, O_RDWR | O_CREAT, MQ_MODE, NULL);
+    //printf("%s %s\n", name_write, name_read);
+    v->testers[v->testersSize].mq_write = mq_open(name_write, O_RDWR | O_NONBLOCK | O_CREAT, MQ_MODE, &v->attr);
+    v->testers[v->testersSize].mq_read = mq_open(name_read, O_RDWR | O_CREAT, MQ_MODE, &v->attr);
+    if (pipe(v->testers[v->testersSize].pipe_dsc) == -1) {
+		perror("pipe in validator\n");
+	}
+	if (write(v->testers[v->testersSize].pipe_dsc[1], "0", sizeof(char)) != sizeof(char)) {
+		perror("write in validator\n");
+	}
 	v->testersSize++;
 	free(buff);
 }
 
 void handleTester(Machine *m, Validator *v, int i, mqd_t mq_read, char *buff) {
-	printf("tester with pid %d sent '%s'\n", v->testers[i].pid, buff);
+	//printf("tester with pid %d sent '%s'\n", v->testers[i].pid, buff);
 	char *w = malloc(sizeof(char) * MAXLEN);
 	if (strlen(buff) == 0)
 		strcpy(buff, EMPTYCHARSTR);
 	strcpy(w, buff);
-	printf("w=%s\n", w);
 	bool run = testRun(m, w);
-	printf("mam odp od pid %d\n ", v->testers[i].pid);
+	//printf("mam odp od pid %d\n ", v->testers[i].pid);
 	if (run) {
-		v->acc++;
-		v->testers[i].acc++;
+		if (write(v->testers[i].pipe_dsc[1], "1", sizeof(char)) != sizeof(char)) {
+			perror("write in handleTester\n");
+		}
 	}
 	char answer[2];
 	answer[0] = run ? 'A' : 'N';
@@ -147,8 +202,10 @@ void handleTester(Machine *m, Validator *v, int i, mqd_t mq_read, char *buff) {
 	if (ret < 0) {
 		perror("mq_send in validator\n");
 	}
-	v->snt++;
-	printf("sent %s to %d\n", send_buff, v->testers[i].pid);
+	if (write(v->pipe_snt[1], "1", sizeof(char)) != sizeof(char)) {
+		perror("write in handleTester\n");
+	};
+	//printf("sent %s to %d\n", send_buff, v->testers[i].pid);
 	free(buff);
 	free(w);
 }
@@ -163,7 +220,7 @@ void server(Machine *m, Validator *v) {
 	/*
 	// if (poll(&(struct pollfd){ .fd = fd, .events = POLLIN }, 1, 0)==1)
     /* data available */
-    mqd_t testers = mq_open(MQ_NAME_TESTERS, O_RDWR | O_NONBLOCK | O_CREAT, MQ_MODE, NULL);
+    mqd_t testers = mq_open(MQ_NAME_TESTERS, O_RDWR | O_NONBLOCK | O_CREAT, MQ_MODE, &v->attr);
     if (testers == (mqd_t) -1) {
     	perror("mq_open in validator\n");
     }
@@ -184,6 +241,8 @@ void server(Machine *m, Validator *v) {
     	}
     	/* Check if any tester sent smth */
     	for (int i=0; i<v->testersSize; i++) {
+    		if (v->testers[i].dead)
+    			continue;
     		bzero(buff, MSGSIZE);
     		mqd_t mq_write = v->testers[i].mq_write, mq_read = v->testers[i].mq_read;
     		ret = mq_receive(mq_write, buff, MSGSIZE, NULL);
@@ -194,14 +253,13 @@ void server(Machine *m, Validator *v) {
 	    	else {
 	    		/* terminate */
 	    		if (buff[0] == ENDCHAR) {
-	    			printf("GOT ! - GETTING READY TO TERMINATE\n");
-	    			/* send all testers signals to shut down */
-	    			
 	    			/* shut validator down */
 	    			int status = 0; pid_t wpid;
 	    			while ((wpid = wait(&status)) > 0); // wait for all children
+	    			/* send all testers signals to shut down */
+	    			sendKillSignals(v);
 	    			printOutput(v);
-	    			kill(m, v, testers);
+	    			terminate(m, v, testers);
 	    		}
 	    		else {
 	    			/* handle tester's word */
@@ -211,10 +269,14 @@ void server(Machine *m, Validator *v) {
 		    			case -1:
 		    				perror("fork in validator\n");
 		    			case 0: ;
+		    				if (close(v->testers[i].pipe_dsc[0]) != 0)
+		    					perror("close in validator\n");
+		    				if (close(v->pipe_snt[0]) != 0)
+		    					perror("close in validator\n");
 		    				char *tester_buff = malloc(strlen(buff) * sizeof(char));
 		    				strcpy(tester_buff, buff);
 		    				handleTester(m, v, i, mq_read, tester_buff);
-		    				printf("koncze forka...\n");
+		    				//printf("koncze forka...\n");
 		    				exit(0);
 		    			default:
 		    				continue;
@@ -230,6 +292,11 @@ int main() {
 	Machine *machine = malloc(sizeof(Machine));
 	Validator *validator = malloc(sizeof(Validator));
 	validator->testersSize = 0;
+	if (pipe(validator->pipe_snt) == -1) {
+		perror("pipe in validator\n");
+	}
+	validator->attr.mq_maxmsg = 10;
+	validator->attr.mq_msgsize = 8192;
 	readInput(machine);
 	printMachine(machine);
 	

@@ -7,6 +7,10 @@
 #include <string.h>
 #include <strings.h>
 #include <fcntl.h>
+#include <sys/types.h>
+#include <signal.h>
+
+#include <sys/wait.h>
 #include <error.h>
 #include <errno.h>
 #include <sys/stat.h>
@@ -43,12 +47,15 @@ typedef struct Tester {
 	int snt, rcd, acc;
 	mqd_t mq_write, mq_read;
 	int pipe_dsc[2];
+	bool dead;
 } Tester;
 
 typedef struct Validator {
 	int rcd, snt, acc;
 	Tester testers[MAXPROC];
 	int testersSize;
+	int pipe_snt[2];
+	struct mq_attr attr;
 } Validator;
 
 //char *mq_name = "/machineQueue";
