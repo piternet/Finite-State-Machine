@@ -30,7 +30,7 @@
 #define EMPTYCHAR		'.'
 #define EMPTYCHARSTR	"."
 #define MQ_MODE			0666
-#define DEBUG 			1
+#define DEBUG 			0
 
 typedef struct Machine {
 	/* machine consts */

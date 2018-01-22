@@ -47,7 +47,7 @@ void receiveMessages() {
 	else {
 		// we got some word from validator
 		t->rcd++;
-		printf("%s\n", buff);
+		printf("%s \n", buff);
 		char *w = strtok(buff, " ");
 		char *w2 = strtok(NULL, " ");
 		if (w2 == NULL) {
@@ -148,6 +148,7 @@ void handleSignal() {
 }
 
 int main() {
+	setbuf(stdout, NULL);
 	t = malloc(sizeof(Tester));
 	t->rcd = 0;
 	t->acc = 0;

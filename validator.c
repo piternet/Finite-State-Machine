@@ -86,7 +86,7 @@ void printOutput(Validator *v) {
 
 bool testRun(Machine *m, char *w) {
 	// make pipe, dup, execve run
-	if(DEBUG) printf("test_run, w = %s\n", w);
+	//printf("x\n");
 	int pipe_dsc[2];
 	if (pipe(pipe_dsc) == -1) {
 		perror("pipe in validator\n");
@@ -208,7 +208,7 @@ void handleTester(Machine *m, Validator *v, int i, mqd_t mq_read, char *buff) {
 	}
 	if (write(v->pipe_snt[1], "1", sizeof(char)) != sizeof(char)) {
 		perror("write in handleTester\n");
-	};
+	}
 	if(DEBUG) printf("sent %s to %d\n", send_buff, v->testers[i].pid);
 	free(buff);
 	free(w);
@@ -216,14 +216,12 @@ void handleTester(Machine *m, Validator *v, int i, mqd_t mq_read, char *buff) {
 
 void server(Machine *m, Validator *v) {
 	/*
-	*	1. Check if we got any new tester - if yes, add it.
+		1. Check if we got any new tester - if yes, add it.
 		2. Check if any tester sent some word.
 			2a. If he did - fork new run process and send him the word.
 			2b. If the word sent == '!':
 		3. Check if any run process did sent something back to us.
-	/*
-	// if (poll(&(struct pollfd){ .fd = fd, .events = POLLIN }, 1, 0)==1)
-    /* data available */
+	*/
     mqd_t testers = mq_open(MQ_NAME_TESTERS, O_RDWR | O_NONBLOCK | O_CREAT, MQ_MODE, &v->attr);
     if (testers == (mqd_t) -1) {
     	perror("mq_open in validator\n");
@@ -293,16 +291,20 @@ void server(Machine *m, Validator *v) {
 }
 
 int main() {
+	setbuf(stdout, NULL);
 	Machine *machine = malloc(sizeof(Machine));
 	Validator *validator = malloc(sizeof(Validator));
 	validator->testersSize = 0;
 	if (pipe(validator->pipe_snt) == -1) {
 		perror("pipe in validator\n");
 	}
+	if (write(validator->pipe_snt[1], "0", sizeof(char)) != sizeof(char)) {
+		perror("write in validator\n");
+	}
 	validator->attr.mq_maxmsg = 10;
 	validator->attr.mq_msgsize = 8192;
 	readInput(machine);
-	if(DEBUG) printMachine(m);
+	if(DEBUG) printMachine(machine);
 	server(machine, validator);
 	return 0;
 }
