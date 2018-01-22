@@ -103,7 +103,7 @@ void readAndSend() {
     strcat(mqs.name_write, pid_str);
     strcpy(mqs.name_read, "/r");
     strcat(mqs.name_read, pid_str);
-    //printf("%s %s\n", name_write, name_read);
+    if(DEBUG) printf("%s %s\n", mqs.name_write, mqs.name_read);
     mqs.write = mq_open(mqs.name_write, O_WRONLY | O_NONBLOCK | O_CREAT, MQ_MODE, &attr);
     mqs.read = mq_open(mqs.name_read, O_RDONLY | O_CREAT | O_NONBLOCK, MQ_MODE, &attr);
     if (mqs.write == (mqd_t) -1 || mqs.read == (mqd_t) -1) {
@@ -115,7 +115,7 @@ void readAndSend() {
 		if (fgets(line, MAXLEN, stdin) != NULL) {
 			line[strlen(line)-1] = '\0'; // cut last character == '\n'
 			ret = mq_send(mqs.write, line, strlen(line), 1);
-			//printf("sent '%s' to validator\n", line);
+			if(DEBUG) printf("sent '%s' to validator\n", line);
 		    if (ret < 0) {
 		    	perror("mq_send in tester\n");
 		    	terminate();
