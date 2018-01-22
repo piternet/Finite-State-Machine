@@ -22,12 +22,12 @@ bool accept(Machine *m, char *w, int *r, int ri, int val) {
 	bool result = r[ri] < m->U;
 	pid_t child_pid, wpid;
 	int pipe_dsc[2], status = 0;
-	if (pipe(pipe_dsc) == -1) {
-		terminate(m, w, r);
-		perror("pipe in run\n");
-	}
 	// printf("pid=%d, ri=%d, r[ri]=%d; pipe_read=%d, pipe_write=%d\n", getpid(), ri, r[ri], pipe_dsc[0], pipe_dsc[1]);
 	if (m->transSize[r[ri]][wi] > 1) {
+		if (pipe(pipe_dsc) == -1) {
+			terminate(m, w, r);
+			perror("pipe in run\n");
+		}
 		while (i < m->transSize[r[ri]][wi]) {
 			switch (child_pid = fork()) {
 				case -1:

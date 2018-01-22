@@ -1,20 +1,25 @@
 #include "helper.h"
 
+void closeTester(Validator *v, int i) {
+	if (mq_close(v->testers[i].mq_read))
+		perror("mq_close testers in validator\n");
+	if (mq_close(v->testers[i].mq_write))
+		perror("mq_close testers in validator\n");
+	if (close(v->testers[i].pipe_dsc[0]))
+		perror("close pipe in validator\n");
+	if (close(v->testers[i].pipe_dsc[1]))
+		perror("close pipe in validator\n");
+	// testers should do mq_unlink
+}
+
 void terminate(Machine *m, Validator *v, mqd_t testers) {
 	if (mq_close(testers))
 		perror("mq_close testers in validator\n");
 	if (mq_unlink(MQ_NAME_TESTERS))
 		perror("mq_unlink testers in validator\n");
 	for (int i=0; i<v->testersSize; i++) {
-		if (mq_close(v->testers[i].mq_read))
-			perror("mq_close testers in validator\n");
-		if (mq_close(v->testers[i].mq_write))
-			perror("mq_close testers in validator\n");
-		if (close(v->testers[i].pipe_dsc[0]))
-			perror("close pipe in validator\n");
-		if (close(v->testers[i].pipe_dsc[1]))
-			perror("close pipe in validator\n");
-		// testers should do mq_unlink
+		if (!v->testers[i].dead)
+			closeTester(v, i);
 	}
 	if (close(v->pipe_snt[0]))
 		perror("close pipe in validator\n");
@@ -133,9 +138,7 @@ void sendKillSignals(Validator *v) {
 		//printf("killing %d\n", v->testers[i].pid);
 		if (v->testers[i].dead)
 			continue;
-		if (kill(v->testers[i].pid, SIGRTMIN) == -1) {
-			perror("kill in validator\n");
-		}  
+		kill(v->testers[i].pid, SIGRTMIN);
 	}
 }
 
@@ -144,8 +147,10 @@ void newTester(Machine *m, Validator *v, char *buff) {
 		// dead message
 		pid_t tester_pid = (pid_t) atoi(buff+1);
 		for (int i=0; i<v->testersSize; i++) {
-			if (v->testers[i].pid == tester_pid)
+			if (v->testers[i].pid == tester_pid) {
 				v->testers[i].dead = true;
+				closeTester(v, i);
+			}
 		}
 		return;
 	}
@@ -298,7 +303,6 @@ int main() {
 	validator->attr.mq_maxmsg = 10;
 	validator->attr.mq_msgsize = 8192;
 	readInput(machine);
-	printMachine(machine);
 	
 	server(machine, validator);
 	return 0;
